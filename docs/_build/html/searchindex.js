@@ -1,0 +1,1 @@
+Search.setIndex({docnames:["index"],envversion:53,filenames:["index.rst"],objects:{},objnames:{},objtypes:{},terms:{ancient:0,avail:0,document:0,github:0,live:0,toolkit:0},titles:["altk"],titleterms:{altk:0}})

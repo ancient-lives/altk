@@ -1,0 +1,628 @@
+crowdcurio-client
+=================
+
+This is the documentation for the CrowdCurio Python client that interfaces with the `CrowdCurio`_ crowdsourcing platform.
+
+
+Primary Features
+----------------
+
+- Creating and managing crowdsourcing projects and tasks.
+- Creating, managing, and monitoring crowdsourcing experiments.
+
+
+Installation
+------------
+
+At the moment, the only way to install this package is via pip:
+
+.. code-block:: bash
+
+    pip install crowdcurio-client
+
+
+Authentication
+--------------
+
+In order to use this library, any code **must** be ran in an authenticated manner. In order to authenticate, you must have a registered account on `CrowdCurio`_. Whenever *any* model is created on the platform, the authenticated user is registered as the Owner of the model. In order to make changes to the model, you **must** be the model's Owner.
+
+.. code-block:: python
+
+    from crowdcurio_client import CrowdCurio
+
+    # Authenticate with CrowdCurio
+    CrowdCurio.connect(username='YOUR_USERNAME', 
+                       password='YOUR_PASSWORD', 
+                       endpoint='https://www.crowdcurio.com', 
+                       client_id='...', 
+                       client_secret='...')
+
+
+**Note:** The client_id and client_secret parameters are available from the author of the package upon request.
+
+
+Model IDs and Slugs
+-------------------
+
+Instances of any model on our system are identifable by ID and by Slug. Similar to IDs, Slugs are globally unique string identifiers for models. Slugs are automatically generated based on the required "name" attribute whenever a new instance of a model is created. If the automatically generated slug is already taken, the API will throw an Exception in the form an Error 400. You can retreive instances of models by using the *find()* function with a specified ID or slug.
+
+.. code-block:: python
+
+    from crowdcurio_client import Project
+
+    # Find by ID
+    p = Project.find('8')
+    # identical to: p = Project.find(id='8')
+
+    # Find by Slug
+    p = Project.find(slug='thoreau-s-field-notes')
+
+
+
+Models are not given an id or slug until the instance has been saved to the system. 
+
+.. code-block:: python
+
+    from crowdcurio_client import Project
+
+    # Create a Project
+    p = Project() 
+    p.name = "Thoreau's Field Notes"
+    
+    # After this line executes, "p" will be given an id and slug attribute.
+    p.save()
+
+    # Print the instance's ID.
+    print p.id
+
+
+Filtering Instances
+-------------------
+
+You may want to retrieve a set of filtered results instead of an exact instance of a model. The *where()* function retrieves a filtered or unfiltered set of instances. 
+
+.. code-block:: python
+
+    from crowdcurio_client import Project
+
+    # print name of all Project instances
+    # equivalent to: {endpoint}/api/project/
+    for p in Project.where():
+        print p.name
+    
+
+    # print name of all Project instances owned by User 1
+    # equivalent to: {endpoint}/api/project/?owner=1
+    for p in Project.where(owner=1):
+        print p.name
+    
+
+Support
+-------
+
+For questions or concerns, please e-mail the author of the package.
+
+
+Managing Projects
+=================
+This section discusses the intricacies of creating and managing crowdsourcing projects on CrowdCurio. The photo below visualizes the CrowdCurio Project schema.
+
+.. image:: https://curio-media.s3.amazonaws.com/crowdcurio-model.png
+   :align: center
+
+Projects form the basis of `CrowdCurio`_'s data model. Each project contains at least one *Curio*. Each Curio represents a particular research question. Each Curio is matched to a single Task object that describes the crowdsourcing task that participants are asked to perform. In addition, each Curio has a set of attached Datasets that funnel directly into the attached Task. 
+
+Projects
+--------
+Project creation is the first step toward establishing a new research project on CrowdCurio.
+
+.. code-block:: python
+
+    from crowdcurio_client import Project
+
+    # Create a Project
+    p = Project() 
+    p.name = "Thoreau's Field Notes"
+    p.short_description = "How does climate change affect the timing of when buds, flowers and fruits come out?"
+    p.avatar = 'https://curio-media.s3.amazonaws.com/thoreaus-field-notes/avatar.jpg'
+    p.is_active='1'
+    p.save()
+    
+    # Manage or Update a Project
+    p = Project.find(slug='thoreau-s-field-notes') 
+    p.short_description = 'A new description'
+    p.save()
+
+    # Delete a Project
+    p = Project.find(slug='thoreau-s-field-notes') 
+    p.destroy()
+    # !! Note -- This is irreversible and deletes *everything* connected to the project. !!
+    # destroy() should only be used in sceanrios where project creation and management is being tested.
+
+
+
+Curios
+------
+Each Curio is representative of a specific research question and encapsulates the computational effort for answering the question. Creating and attached a new Curio to an existing Project is straightforward:
+
+.. code-block:: python
+
+    from crowdcurio_client import Project, Curio
+
+    # Get a reference to an existing Project
+    p = Project.find(slug='thoreau-s-field-notes')
+    
+    # Create a Curio
+    c = Curio()
+    c.title = 'Chelidonium vs Vaccinium'
+    c.data_type = 'I'
+    c.question = 'What are the differences in the climate change response of Chelidonium and Vaccinium?'
+    c.motivation = "Who doesn't like blueberries?"
+    c.save()
+    
+    # Attach the Curio to a Project.
+    c.add(p)
+
+The *data_type* attribute is reflective of the type of artifact being distributed to users. Available types include:
+
+1. Image -- I
+2. Audio -- A
+3. Video -- V
+4. Time-Series -- T
+5. HCI Experiment -- H
+
+
+Tasks
+-----
+The Task model describes the mechanism for answering the question posed in the Curio. One particular attribute of the Task model (*task_type*) dictates the interface that appears on the front-end for a Curio:
+
+.. code-block:: python
+
+    from crowdcurio_client import Curio, Task
+    
+    # Get a reference to an existing Curio
+    c = Curio.find(slug='chelidonium-vs-vaccinium')
+
+    # Create a Task
+    t = Task()
+    t.name = 'Chelidonium vs Vaccinium Task'
+    t.type = 'C'
+    t.labels = ["Bud", "Fruit", "Flower"]
+    t.save()
+    
+    # Attach the Task to the Curio
+    t.add(c)
+
+The *task_type* attribute is reflective of the crowdsourcing task type that participants are asked to perform. Available types include:
+
+1. Classification -- C
+2. Transcription -- T
+3. Labeling -- L
+4. Story -- S
+5. Form -- F
+6. Mouse -- M 
+
+
+Datasets, Data, and DataRecords
+-------------------------------
+The Data model is flexible in design and is representive of artifacts that are given to participants. As expected, a single DataSet model encapsulates many Data models and is directly attached to a specific Curio. 
+
+.. image :: https://curio-media.s3.amazonaws.com/crowdcurio-taskrouter.png
+
+The photo above illustrates the relationship between DataSets, Data, DataRecords, and the CrowdCurio Task Router. DataRecords are **required** for Data to be distributed by the system. DataRecords track information for a particular piece of data, such as if a particular user has already seen a Data object.
+
+.. code-block:: python
+
+    from crowdcurio_client import Curio, Task, DataSet, DataRecord, Data
+    
+    # Get a reference to an existing Curio and Task
+    c = Curio.find(slug='chelidonium-vs-vaccinium')
+    t = Task.find(slug='chelidonium-vs-vaccinium-task')
+
+    # Create a Dataset with a Name
+    ds = DataSet()
+    ds.name = 'April 2016 Herbarium Record Dataset'
+    ds.save()
+
+    # Here, we assume a CSV file exists with Data represented by each row.
+    with open('thoreaus-data.csv') as f:
+      for line in f:
+        # get the class label (i.e. Vaccinium / Chelidonium)
+        class_label = line.split(',')[1]
+
+        # get the url of the image
+        url = line.split(',')[2]
+
+        # create a Data object
+        d = Data()
+
+        # name the Data object
+        d.name = 'thoreaus '+url.split('/')[-1].replace('.jpg','')
+        
+        # specify a url for each piece of data.
+        d.url = url
+        
+        # "content" is a JSON field for any additional metadata that needs to be sent to the front-end.
+        #   In this case, we attach a 'class_label' variable to the images to determine which examples
+        #   images we show to participants.
+        d.content = {'class_label' : class_label}
+        #d.content = {'class_label' : 'Chelidonium'} # An alternative plant-genus.
+
+        # save the Data object to the system.
+        d.save()
+
+        # attach the Data object to a Dataset.
+        d.add(ds)
+
+        # create a DataRecord for the Task Router
+        dr = DataRecord()
+        dr.save()
+        dr.add(t,d)
+
+        # if we wanted to specify an order for task distribution, you can adjust the order attribute on 
+        # the DataRecord. By default, this value is set to 1.
+        dr.order = ...
+        dr.save()
+
+    # Attach Dataset to Curio
+    ds.add(c)
+
+
+
+Resources
+---------
+Resources are a general-purpose model that stores any additional information required by Task. As an example, we'll refer to the Thoreau's Field Notes project which supplies a variety of reference images for its image classification task:
+
+
+.. code-block:: python
+
+    example_imgs = [
+      {
+          "name": "Chelidonium",
+          "class_label": "bud",
+          "url": [  
+              "http://citsci.s3.amazonaws.com/nevp/examples/Chelidonium_bd1.jpg",
+              "http://citsci.s3.amazonaws.com/nevp/examples/Chelidonium_bd2.jpg",
+              "http://citsci.s3.amazonaws.com/nevp/examples/Chelidonium_bd3.jpg"
+          ]
+        },
+        {
+            "name": "Chelidonium",
+            "class_label": "fruit",
+            "url": [  
+              "http://citsci.s3.amazonaws.com/nevp/examples/Chelidonium_fr1.jpg",
+              "http://citsci.s3.amazonaws.com/nevp/examples/Chelidonium_fr2.jpg",
+                "http://citsci.s3.amazonaws.com/nevp/examples/Chelidonium_fr3.jpg"
+            ]
+          },
+        {
+            "name" : "Chelidonium",
+            "class_label" : "flower",
+            "url" : [
+                "http://citsci.s3.amazonaws.com/nevp/examples/Chelidonium_fl1.jpg",
+                "http://citsci.s3.amazonaws.com/nevp/examples/Chelidonium_fl2.jpg",
+                "http://citsci.s3.amazonaws.com/nevp/examples/Chelidonium_fl3.jpg"
+            ]
+          },
+        {
+            "name" : "Vaccinium",
+            "class_label" : "bud",
+            "url" : [
+                "http://citsci.s3.amazonaws.com/nevp/examples/Chelidonium_bd4.jpg",
+                "http://citsci.s3.amazonaws.com/nevp/examples/Chelidonium_bd5.jpg",
+                "http://citsci.s3.amazonaws.com/nevp/examples/Chelidonium_bd6.jpg"
+            ]
+          },
+        {
+            "name" : "Vaccinium",
+            "class_label" : "fruit",
+            "url" : [
+                "http://citsci.s3.amazonaws.com/nevp/examples/Vaccinium_fr1.jpg",
+                "http://citsci.s3.amazonaws.com/nevp/examples/Vaccinium_fr2.jpg",
+              "http://citsci.s3.amazonaws.com/nevp/examples/Vaccinium_fr3.jpg"
+            ]
+          },
+        {
+            "name" : "Vaccinium",
+            "class_label" : "flower",
+            "url" : [
+                "http://citsci.s3.amazonaws.com/nevp/examples/Vaccinium_fl5.jpg",
+                "http://citsci.s3.amazonaws.com/nevp/examples/Vaccinium_fl4.jpg",
+                "https://citsci.s3.amazonaws.com/nevp/examples/Chelidonium_fl4.jpg"
+            ]
+          }
+    ]
+
+    for img in example_imgs:
+      # create a Resource
+      r = Resource()
+
+      # update the Resource's name, url and class_label attributes
+      r.name = img['name']+'-'+img['class_label']
+      r.class_label = img['class_label']
+      r.url = img['url']
+
+      # save
+      r.save()
+
+**Note**: Many projects do not utilize the Resource model. It's okay if you don't end-up using it!
+
+
+Managing Experiments
+====================
+This section explains how experiments can be ran on CrowdCurio. 
+
+
+The Experiment model is representative of entire experiments on CrowdCurio. `CrowdCurio`_'s Experiments module is built around A/B testing, and therefore, each experiment must have *at least* one Condition object in order to function correctly. Of course, you will need more than a single Condition in order to test your hypothesis. 
+
+
+Experiments
+-----------
+The Experiment model is representative of entire experiments on CrowdCurio.
+
+
+.. code-block:: python
+
+    from crowdcurio_client import Project, Curio, Task, Experiment
+
+    # create an experiment
+    e = Experiment()
+    e.name = "UrbanEars Experiment"
+
+    # restrict to specific browsers
+    e.restrictions = { 
+            "browser": ["chrome", "safari", "firefox"]
+          } 
+
+    # the 'params' attribute stores preferences and account information for crowdsourcing your information through 
+    # other platforms (i.e. Amazon Mechanical Turk). this field is *only* visible via the API if you are the owner 
+    # of the Experiment instance.
+    e.params = {
+      "mturk" : {
+        # Amazon Account Credentials
+        "aws_access_key_id": "YOUR_KEY_HERE",
+        "aws_secret_access_key": "YOUR_SECRET_KEY_HERE",
+
+        # Specify how frequently you want our system to delete and repost HITs to Mechanical Turk.
+        "report_time_in_seconds": 360,
+
+        # Specify the HTML template IDs from Amazon Mechanical Turk.
+        # These IDs are available via the MTurk Requester interface.
+        "hit_type_id": "32HMK6WX8ZQH60DBOF3D1B1ZX2VK3E",
+        "layout_id": "3BM7FCA6BNZ3O9CG18WOL0ESW2EQYF"
+      }
+    }
+
+    # Save the Experiment
+    e.save()
+
+
+    # Get references to the existing Project, Curio
+    p = Project.find("409")
+    c = Curio.find("223")
+    t = Task.find("216")
+
+    # Tell CrowdCurio which Task/Curio/Project this experiment is attached to.
+    e.add(p, c, t)
+
+After you have assigned the Experiment to a Project, Task, and Curio, you can find your Experiment at: https://www.crowdcurio.com/experiments/experiment-id/. You can find your *experiment-id*, after *e.save()* has been successfully ran, by printing the value of *e.id*.
+
+Conditions
+----------
+Experiments are populated with Conditions. There is no limit to the number of Conditions that can be attached to a single Experiment. The creation of a Condition is simple, but tedious due to the amount of information associated with a Condition.
+
+.. code-block:: python
+
+    # Get a reference to an existing Experiment
+    e = Experiment.find(name='UrbanEars Experiment')
+    
+    # Create the consent form to be used in each condition
+    #   Each tuple maps to: ("Section Header", "Section Content"). If you need a break in the middle of section,
+    #   you can set the first entry in the tuple as an empty string.
+    consent_form = [
+        # Title Section
+        ("Title", "Effectively Collecting Crowdsourced Annotations of Urban Sounds and Audio"),
+        
+        # Objective Section
+        ("Objective", "This HIT has been generated as a part of a study being conducted by ... "),
+        
+        # Study Details
+        ("Study Details", "If you decide to participate, you will be annotating 10-second audio clips that have been recorded in various famous cities from across the world."),
+        
+        # Renumeration Section
+        ("Renumeration", "To get the base payment of (##) cents, you are required to ..."),
+        
+        # Risk Section
+        ("Withdrawal", "Participation in this study is voluntary. You may decline to answer any questions ..."),
+        
+        # Risk Section
+        ("Risk", "This study will use audio clips that contain noises that individuals are likely to encounter in everyday city living. The study will take place online and hence, participants will either perform the study under their own time and location, making it very unlikely that any risk compared to everyday life will be experienced. Furthermore, tasks require no physical or emotional contribution."),
+        
+        # Continuation of Risk Section
+        ("", "When information is transmitted over the internet privacy cannot be guaranteed. There is always a risk your responses may be intercepted by a third party  (e.g., government agencies, hackers). University of Waterloo researchers will not collect or use internet protocol (IP) addresses or other information which could link your participation to your computer or electronic device without first  informing you. The host of the system collecting the data such as Google Form may collect this information without our knowledge and make this accessible to us. We will not use or save this information without your consent. If you prefer not to submit your survey responses through this host, please contact the investigator so you can participate using an alternative method such as through an e-mail or paper-based questionnaire."),
+
+        # Confidentiality Section
+        ("Confidentiality", "It is important for you to know that any information that you provide will be confidential. All of the data will be summarized and no individual could be identified from these summarized results.   Because this is an anonymous survey, the researchers have no way of identifying you.  Furthermore, the web site is programmed to collect responses alone and will not collect any information that could potentially identify you (such as machine identifiers). The data, with no personal identifiers, collected from this study will be maintained on a password-protected computer database in a restricted access area of the university and external servers. As well, the data will be electronically archived after completion of the study and maintained for 8 years and then erased. Should you have any questions about the study, please contact either Edith Law (edith.law@uwaterloo.ca), Stefanie Mikloska (smiklosk@uwaterloo.ca) or Alex Williams (Alex.Williams@uwaterloo.ca). Further, if you would like to receive a copy of the results of this study, please contact either investigator. This study has been reviewed and received ethics clearance through a University of Waterloo Research Ethics Committee.  However, the final decision about participation is yours. If you have any comments or concerns resulting from your participation in this study, please contact the Chief Ethics Officer, Office of Research Ethics, at 1-519-888-4567, ext. 36005 or ore-ceo@uwaterloo.ca."),
+        
+        # Contact Section
+        ("Contact", "This study has been reviewed and received ethics clearance through a University of Waterloo Research Ethics Committee.  However, the final decision about participation is yours. If you have any comments or concerns resulting from your participation in this study, please contact the Chief Ethics Officer, Office of Research Ethics, at 1-519-888-4567, ext. 36005 or ore-ceo@uwaterloo.ca.")
+        
+        # People Section
+        ("People", [ ["Edith Law", "email1@address.com"],
+                    ["Stefanie Mikloska", "smiklosk@uwaterloo.ca"], 
+                    ["Alex Williams", "Alex.Williams@uwaterloo.ca"]])
+    ]
+
+    # create a configuration for each condition in the experiment
+    config = {
+      # define a workflow for the experiment
+      #     : Each entry in the workflow is a key in the config JSON object. Each key in the workflow list of 
+      #       strings must begin with one of the following keywords: 
+      #         (1) "consent", (2) "training", (3) "task", (4), "questionnaire", (5) "screening"
+      #
+      #     Each one of these is mapped to render a specific template.
+
+      "workflow": ["consent", "training", "screening", "task1", "questionnaire"],
+      "workflow_idx": 0,
+
+      # attach the consent form
+      "consent": consent_form,
+
+      # specify training
+      "training": {
+        "type": "V", # Video
+        "pay": 0.00, # Pay for Training
+        "metadata":{
+          "instructions": "Your task is to label different sounds in 10-second audio clips.",
+          "url": "https://curio-media.s3.amazonaws.com/urban-ears/image_feedback_training.mp4"
+        }
+      },
+
+      # specify screening
+      # if you have an external service that you'd like to route users to, you should use this 
+      # directive. the service must return a code to users for validation.
+      "screening": {
+        "url": "http://someurl.org,
+        "pass": "1111"
+      },
+
+      # specify the task attributes
+      "task1" : {
+        "order": ["urbanears-31", "urbanears-32", "urbanears-33", "urbanears-34", "urbanears-35", "urbanears-36", "urbanears-37", "urbanears-38", "urbanears-39", "urbanears-40"],
+        "pay": 0.24,
+        "bonus": 0.04,
+        "batch_size": 10
+      },
+
+      # attach a questionnaire
+      "questionnaire":{
+        "name": "Post-Questionnaire",
+        "url": "https://docs.google.com/forms/d/e/1FAIpQLScqsTuCV8YGhWeUrtoY9_b7Bd-7akKbXKuywJcjKn9X_U5z5A/viewform?embedded=true",
+        "pay": 0.00
+      }
+    }
+
+    # create conditions for the experiment
+    c1 = Condition()
+    c1.name = "hiddenImage"
+
+    # define the maximum number of subjects for the condition
+    c1.max_subjects = 100
+
+    # attach the configuration
+    c1.configuration = config
+    c1.save()
+
+    # add the Condition to the experiment
+    c1.add(e)
+
+Here, we demonstrated the creation of a single Condition. In practice, the creation of additional Conditions should happen in an identical manner. The Experiments module automatically assigns a participant to a Condition for you. However, this can be overridden by directing a participant to the following URL **before beginning the experiment**: https://www.crowdcurio.com/experiments/experiment-id/workflow/assign/condition-name/. 
+
+
+DataRecords
+-----------
+In order to allow the Task Router to distinguish between versions of a Task that are public and experimental, we create new DataRecord objects specifically for each experiment. However, we do *not* create entirely new Data models:
+
+.. code-block:: python
+
+    # in order to avoid creating duplicate Data models, we find that DataSet that's been contains 
+    # the Data we want to use for the experiment. In this case, we are retrieving the Data by 
+    # filtering by DataSet ID. 
+    datas = Data.where(dataset="214", page_size=1000)
+
+    # create data records for the task router for this condition
+    for data in datas:
+      if data.attributes['slug'] in config["task1"]["order"]:
+        # create the data record
+        dr = DataRecord()
+        
+        # in this experiment, we want to ensure participants receive pieces of data in a particular order.
+        # we therefore specify the order for the particular piece of data manually.
+        dr.order = config["task1"]["order"].index(data.slug])+1
+        dr.save()
+
+        # link the data record
+        dr.add(t, data, e, c1) 
+
+
+SubjectionConditions
+----------
+When a person joins an Experiment, CrowdCurio creates a new instance of a SubjectCondition. The SubjectCondition instance retains the state of a person's progress throughout an experiment including whether or not they have finished an experiment or been disqualified.
+
+.. code-block:: python
+
+    # Get a reference to an existing Experiment and 
+    e = Experiment.find(name='UrbanEars Experiment')
+    u = User.find('45')
+
+    # Get a reference to an existing SubjectCondition 
+    sc = SubjectCondition.find('45')
+
+    # Alter the Invalidated attribute
+    sc.invalidated = False
+    sc.save()
+
+
+
+ConfirmationCodes
+-----------------
+After a person has completed an experiment, a new ConfirmationCode is generated. A ConfirmationCode has a single attribute that is a saved instance of Python's UUID function call. Each ConfirmationCode is mapped to an experiment and a user.
+
+.. code-block:: python
+
+    # Get a reference to an existing Experiment and User
+    e = Experiment.find(name='UrbanEars Experiment')
+    u = User.find('45')
+
+    # Get a reference to an existing ConfirmationCode
+    cc = ConfirmationCode.where(experiment=e, user=u)
+
+    # Print the code
+    print cc[0].code
+
+
+Bonus Payments
+--------------
+Bonus payments are created and saved whenever a worker performs optional tasks. Bonus payments are mapped to an experiment and a user.
+
+.. code-block:: python
+
+    # Get a reference to an existing Experiment and User
+    e = Experiment.find(name='UrbanEars Experiment')
+    u = User.find('45')
+
+    # Get a reference to an existing ConfirmationCode
+    bp = BonusPayment.where(experiment=e, user=u)
+
+    # Print the bonus amount and whether or not it has been dispensed already.
+    print bp[0].amount
+    print bp[0].dispensed
+
+    
+
+Managing Collected Data
+====================
+
+
+Exporting Responses
+-------------------
+Through the Response model, you can export the experimental data you've collected at any time. This allows you to create and structure your own CSV files to your own pleasing. It's as simple as writing a small for-loop:
+
+.. code-block:: python
+
+    from crowdcurio_client import Response
+    
+    # Retrieve all the Responses for Experiment ID 155
+    for r in Response.where(experiment="155"):
+        # Print the contributing user's ID.
+        print "User ID: " + r.relationships['owner']['id']
+
+        # 'content' is a JSON field that can arbitrarily fit *anything*.
+        # as such, each project's content field is unique and contains data relevant for the specific task.
+        print r.content
+
+It should be noted that only Responses for projects that you own will be available to you through the client.
+
+.. target-notes::
+
+.. _`CrowdCurio`: https://www.crowdcurio.com/

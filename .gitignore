@@ -1,0 +1,12 @@
+.vscode/*
+build/*
+dist/*
+altk.egg-info/*
+test.py
+*.pyc
+*.DS_Store
+consensus/*
+clicks/*
+markers_all.txt
+markers_trimmed.txt
+statistics.txt
